@@ -4,7 +4,10 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram import F
 from aiogram.types import PreCheckoutQuery, Message, ContentType, BotCommand, InlineKeyboardButton, InlineKeyboardMarkup
+from db import Database
 
+import time
+import datetime
 
 # log
 logging.basicConfig(level=logging.INFO)
@@ -13,7 +16,20 @@ bot = Bot(token=config.TOKEN)
 dp = Dispatcher()
 
 
+db = Database('database.db')
+def days_to_seconds(days):
+    return days*24*60*60
 
+def time_sub_day(get_time):
+    time_now = int(time.time())
+    middle_time = int(get_time)-time_now
+
+
+    if middle_time<= 0:
+        return False
+    else:
+        dt = str(datetime.timedelta(seconds=middle_time))
+        return dt
     
 # dp.pre_checkout_query.register(process_pre_checkout_query)
 # dp.message.register(success_payment,F.successful_payment)
@@ -40,9 +56,15 @@ async def buy(message: Message):
     ])
     await message.answer("Выберите срок подписки:", reply_markup=keyboard)
 
+# Текущая подписка
+@dp.message(Command(commands=['sub']))
+async def sub(message:Message):
+    if message.text == 'Профиль':
+        user_sub = time_sub_day(db.get_time_sub(message.from_user.id))
+        if user_sub == False:
+            user_sub = 'Подписка закончилась'
 
-
-@dp.callback_query(lambda c: c.data and c.data.startswith('buy'))
+@dp.callback_query_handler(lambda c: c.data and c.data.startswith('buy_'))
 async def process_subscription_selection(callback_query: types.CallbackQuery):
     duration = callback_query.data.split('_')[1]  # Extract duration (e.g., "1", "3", "6, )
     prices = {
@@ -87,6 +109,9 @@ async def process_pre_checkout_query(pre_checkout_query:PreCheckoutQuery, bot:Bo
 # successful payment
 @dp.message(F.content_type == ContentType.SUCCESSFUL_PAYMENT)
 async def success_payment(message:Message, bot:Bot):
+    if message.successful_payment.invoice_payload == f"subscription-{duration}-months-payload":
+        time_sub = int(time.time()) + days_to_seconds(30)
+        db.set_time_sub(message.from_user.id, time_sub)
     await message.answer('Платеж прошел успешно держи ссылку на канал  https://t.me/Rus_chatbot27')
 
 
