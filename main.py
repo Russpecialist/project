@@ -4,7 +4,11 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram import F
 from aiogram.types import PreCheckoutQuery, Message, ContentType, BotCommand, InlineKeyboardButton, InlineKeyboardMarkup
+from db import Database
+import sqlite3
 
+import time
+import datetime
 
 # log
 logging.basicConfig(level=logging.INFO)
@@ -12,9 +16,21 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token=config.TOKEN)
 dp = Dispatcher()
 
+db = Database('database.db')
+def days_to_seconds(days):
+    return days*24*60*60
+
+def time_sub_day(get_time):
+    time_now = int(time.time())
+    middle_time = int(get_time)-time_now
 
 
-    
+    if middle_time<= 0:
+        return False
+    else:
+        dt = str(datetime.timedelta(seconds=middle_time))
+        return dt
+
 # dp.pre_checkout_query.register(process_pre_checkout_query)
 # dp.message.register(success_payment,F.successful_payment)
 
@@ -28,15 +44,18 @@ PRICE_12_MONTHS = types.LabeledPrice(label = 'Подписка на 12 меся�
 
 @dp.message(Command(commands=["start"]))
 async def process_start_command(message: Message):
-    await message.answer('Привет!\nЯ бот помощник отправь команду /buy для выбора тарифа')
-
+        conn = sqlite3.connect('db_file', check_same_thread=False)
+        cursor = conn.cursor()
+        await message.answer('Привет!\nЯ бот помощник отправь команду /buy для выбора тарифа')
+        
 #buy
 @dp.message(Command(commands=["buy"]))
 async def buy(message: Message):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="1 месяц - 500₽", callback_data="buy_1_month")],
         [InlineKeyboardButton(text="3 месяца - 1300₽", callback_data="buy_3_months")],
-        [InlineKeyboardButton(text="6 месяцев - 2400₽", callback_data="buy_6_months")]  
+        [InlineKeyboardButton(text="6 месяцев - 2400₽", callback_data="buy_6_months")],
+        [InlineKeyboardButton(text="12 месяцев - 5000₽", callback_data="buy_12_months")] 
     ])
     await message.answer("Выберите срок подписки:", reply_markup=keyboard)
 
@@ -44,11 +63,12 @@ async def buy(message: Message):
 
 @dp.callback_query(lambda c: c.data and c.data.startswith('buy'))
 async def process_subscription_selection(callback_query: types.CallbackQuery):
-    duration = callback_query.data.split('_')[1]  # Extract duration (e.g., "1", "3", "6, )
+    duration = callback_query.data.split('_')[1]  # Extract duration (e.g., "1", "3", "6, 12)
     prices = {
         "1": PRICE_1_MONTH,
         "3": PRICE_3_MONTHS,
         "6": PRICE_6_MONTHS,
+        "12": PRICE_12_MONTHS
         
     }
     selected_price = prices.get(duration)
@@ -72,7 +92,9 @@ async def process_subscription_selection(callback_query: types.CallbackQuery):
         is_flexible=False,
         prices=[selected_price],
         start_parameter=f"subscription-{duration}-months",
-        payload=f"subscription-{duration}-months-payload")
+        payload = "month_sub")
+        #payload= f"subscription-{duration}-months-payload")
+        
 
 # @dp.message(Command(commands = ['buy']))
 # async def buy(message:Message):
@@ -86,10 +108,12 @@ async def process_pre_checkout_query(pre_checkout_query:PreCheckoutQuery, bot:Bo
 
 # successful payment
 @dp.message(F.content_type == ContentType.SUCCESSFUL_PAYMENT)
-async def success_payment(message:Message, bot:Bot):
-    await message.answer('Платеж прошел успешно держи ссылку на канал  https://t.me/Rus_chatbot27')
-
-
+async def process_pay(message:Message, bot:Bot):
+    if message.successful_payment.invoice_payload == "month_sub":
+        time_sub = int(time.time()+days_to_seconds(30))
+        db.set_time_sub (message.from_user.id, time_sub)
+        await bot.send_message(message.from_user.id,'Платеж прошел успешно держи ссылку на канал  https://t.me/Rus_chatbot27')
+    
 # Создаем асинхронную функцию
 async def set_main_menu(bot: Bot):
 

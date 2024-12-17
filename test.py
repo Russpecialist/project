@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token=config.TOKEN)
 dp = Dispatcher()
 
-
+# Перевод количества дней в секунды
 db = Database('database.db')
 def days_to_seconds(days):
     return days*24*60*60
@@ -52,7 +52,8 @@ async def buy(message: Message):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="1 месяц - 500₽", callback_data="buy_1_month")],
         [InlineKeyboardButton(text="3 месяца - 1300₽", callback_data="buy_3_months")],
-        [InlineKeyboardButton(text="6 месяцев - 2400₽", callback_data="buy_6_months")]  
+        [InlineKeyboardButton(text="6 месяцев - 2400₽", callback_data="buy_6_months")],
+        [InlineKeyboardButton(text="12 месяцеев - 5000₽", callback_data="buy_12_months")] 
     ])
     await message.answer("Выберите срок подписки:", reply_markup=keyboard)
 
@@ -62,19 +63,21 @@ async def sub(message:Message):
     if message.text == 'Профиль':
         user_sub = time_sub_day(db.get_time_sub(message.from_user.id))
         if user_sub == False:
-            user_sub = 'Подписка закончилась'
+            chat_id = message.chat.id
+            user_id = message.reply_to_message.from_user.id
+            bot.kick_chat_member(chat_id, user_id)
+            bot.reply_to(message, f"Пользователь {message.reply_to_message.from_user.username} был кикнут.")
 
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith('buy_'))
 async def process_subscription_selection(callback_query: types.CallbackQuery):
-    duration = callback_query.data.split('_')[1]  # Extract duration (e.g., "1", "3", "6, )
+    duration = callback_query.data.split('_')[1]  # Extract duration (e.g., "1", "3", "6, 12)
     prices = {
         "1": PRICE_1_MONTH,
         "3": PRICE_3_MONTHS,
         "6": PRICE_6_MONTHS,
-        
+        "12": PRICE_12_MONTHS
     }
     selected_price = prices.get(duration)
-    
     if not selected_price:
         await callback_query.answer("Неверный выбор.")
         return

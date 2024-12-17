@@ -37,11 +37,11 @@ class Database:
             for row in result:
                 nickname = str(row[0])
             return nickname
-    
+    #Запись времени
     def set_time_sub(self, user_id, time_sub):
         with self.connection:
             return self.cursor.execute("UPDATE `users` SET `time_sub` = ? WHERE `user_id` = ?", (time_sub, user_id,))
-    
+    #Получение  времени
     def get_time_sub(self, user_id):
         with self.connection:
             result = self.cursor.execute("SELECT `time_sub` FROM `users` WHERE `user_id` = ?", (user_id,)).fetchall()
@@ -49,7 +49,7 @@ class Database:
                 time_sub = int(row[0])
             return time_sub
     
-
+     #Проверка наличия подписки
     def get_sub_status(self, user_id):
         with self.connection:
             result = self.cursor.execute("SELECT `time_sub` FROM `users` WHERE `user_id` = ?", (user_id,)).fetchall()
@@ -60,3 +60,4 @@ class Database:
                 return True
             else:
                 return False
+      
